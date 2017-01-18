@@ -124,7 +124,7 @@ var compare = function(option, userList){
 }
 
 var Args = require("arg-parser"),
-    args = new Args("GitBar", "1.0", "Graph for GitHub");
+    args = new Args("GitBar", "1.0", "GitHub Graph");
 
 // commands
 args.add({name: "myrepo",  switches: ["myrepo"],  desc: "search repos."});
