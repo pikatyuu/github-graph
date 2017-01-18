@@ -1,0 +1,160 @@
+#!/usr/bin/env node
+
+const GitHubApi = require("github");
+const babar = require("babar");
+const argparse = require("argparse");
+const client = new GitHubApi({
+  debug: false,
+  Promise: require("bluebird")
+})
+
+client.authenticate({
+  type: "token",
+  token: process.env.GITHUBTOKEN
+});
+
+
+var searchRepo = function(option, username){
+  var graph = [];
+  var repos = [];
+  var temp = 0;
+  client.repos.getForUser({username: username, sort: option.sort}).then(function(res){
+    for(let i = 0; i < res.length; i++){
+      var stick = 0;
+      for(let l = 0; l < res[i].stargazers_count; l++){
+        if(temp < res[i].stargazers_count){
+          temp = res[i].stargazers_count;
+        }
+        stick++;
+      }
+      repos.push(res[i].name);
+      graph.push([i, stick]);
+    }
+    var maxY = 0;
+    if(temp < 10){
+      maxY = 10;
+    }
+    console.log("user: " + username);
+    console.log(babar(graph, {
+      color: option.color,
+      maxY: maxY
+    }));
+    if(!option.hidden){
+      for(let i = 0; i < repos.length; i++){
+        console.log(i + ": " + repos[i]);
+      }
+    }
+  }).catch(function(error){
+    console.log(error);
+  });
+};
+
+var myRepo = function(option){
+  var graph = [];
+  var repos = [];
+  var temp = 0;
+  client.repos.getAll({sort: option.sort}).then(function(res){
+    for(let i = 0; i < res.length; i++){
+      var stick = 0;
+      for(let l = 0; l < res[i].stargazers_count; l++){
+        if(temp < res[i].stargazers_count){
+          temp = res[i].stargazers_count;
+        }
+        stick++;
+      }
+      repos.push(res[i].name);
+      graph.push([i, stick]);
+    }
+    var maxY = 0;
+    if(temp < 10){
+      maxY = 10;
+    }
+    console.log(babar(graph, {
+      color: option.color,
+      maxY: maxY
+    }));
+    if(!option.hidden){
+      for(let i = 0; i < repos.length; i++){
+        console.log(i + ": " + repos[i]);
+      }
+    }
+  }).catch(function(error){
+    console.log(error);
+  });
+};
+
+var compare = function(option, userList){
+  var graph = [];
+  var promises = [];
+  for(let i = 0; i < userList.length; i++){
+    promises.push(
+      client.repos.getForUser({username: userList[i], sort: option.sort})
+    );
+  }
+  Promise.all(promises).then(function(res){
+    var scoreList = [];
+    var temp = 0;
+    for(let i = 0; i < res.length; i++){
+      var items = res[i];
+      var score = 0;
+      for(let l = 0; l < items.length; l++){
+        score += items[l].stargazers_count;
+      }
+      if(temp < score){
+        temp = score;
+      }
+      scoreList.push([i, score]);
+    }
+    var maxY = 0;
+    if(temp < 10){
+      maxY = 10;
+    }
+    console.log(babar(scoreList, {
+      color: option.color,
+      maxY: maxY
+    }));
+    if(!option.hidden){
+      for(let i = 0; i < userList.length; i++){
+        console.log(i + ": " + userList[i]);
+      }
+    }
+  }).catch(function(error){
+    console.log(error);
+  });
+}
+
+var Args = require("arg-parser"),
+    args = new Args("GitBar", "1.0", "Graph for GitHub");
+
+// commands
+args.add({name: "myrepo",  switches: ["myrepo"],  desc: "search repos."});
+args.add({name: "compare", switches: ["compare"], desc: "compare repos. we should be input name of user."});
+args.add({name: "search",  switches: ["search"],  desc: "search repos. we should be input name of repos."});
+
+// options
+args.add({name: "hidden",  switches: ["--hidden"],  desc: "hidden data of repository. default is false."});
+args.add({name: "sort",  switches: ["-s", "--sort"],  desc: "sort data. default is full_name. we can choose from\
+created, updated, pushed, full_name", value: "boolean"});
+args.add({name: "color", switches: ["-c", "--color"], desc: "set bar color. default is red. supported colors are\n\
+yellow, cyan, white, magenta, green, red, grey, blue, or ascii.",   value: "color"});
+
+// arguments
+args.add({name: "text", desc: "text to store", required: true});
+
+args.params = {hidden: false, color: "red"};
+
+if(args.parse()){
+  var inputs = args.params.text.split(" ");
+  var option = {color: args.params.color, hidden: args.params.hidden, sort: args.params.sort};
+
+  switch(inputs[0]){
+    case "myrepo": myRepo(option); break;
+    case "compare":
+    inputs.shift();
+    compare(option, inputs);
+    break;
+    case "search":
+    searchRepo(option, inputs[1]);
+    break;
+  }
+}
